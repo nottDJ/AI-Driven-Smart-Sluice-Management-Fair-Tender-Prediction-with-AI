@@ -1,38 +1,40 @@
 import pandas as pd
 import numpy as np
-import random
+import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import streamlit as st
 
 # Generate Sample Data
 def generate_data(n=300):
-    random.seed(42)
-    surface_area = np.random.uniform(1, 500, n)  # in km²
-    depth = np.random.uniform(5, 50, n)  # in meters
-    breadth = np.random.uniform(1, 100, n)  # in km
-    previous_maintenance_cost = np.random.uniform(50000, 500000, n)
-    market_rate = np.random.uniform(1.1, 1.5, n)
-    baseline_cost = surface_area * depth * breadth * 0.3  # Hypothetical base cost
-    auction_price = baseline_cost * market_rate + np.random.uniform(-10000, 10000, n)
-    
-    # Simulating data for last 5 years
-    depth_prev = depth + np.random.uniform(-5, 5, n)
-    breadth_prev = breadth + np.random.uniform(-5, 5, n)
-    surface_area_prev = surface_area + np.random.uniform(-10, 10, n)
-    
-    # Determining lake condition and maintenance suggestions
+    np.random.seed(42)
+    surface_area_current = np.random.uniform(1, 500, n)  
+    depth_current = np.random.uniform(5, 50, n)  
+    breadth_current = np.random.uniform(1, 100, n)  
+    inflow_capacity = np.random.uniform(1000, 50000, n)  # Inflow amount in cubic meters per month
+
+    # Automate Target Dimensions Based on Inflow Capacity
+    surface_area_target = surface_area_current + (inflow_capacity / 10000)
+    depth_target = depth_current + (inflow_capacity / 20000)
+    breadth_target = breadth_current + (inflow_capacity / 15000)
+
+    prev_maintenance_cost = np.random.uniform(50000, 500000, n)
+
+    # Calculate differences
+    depth_diff = depth_target - depth_current
+
+    # Determine Condition Based on Depth Difference
     condition = []
     maintenance_suggestions = []
     maintenance_frequency = []
-    for d, dp, b, bp, sa, sap in zip(depth, depth_prev, breadth, breadth_prev, surface_area, surface_area_prev):
-        if d < dp:
+
+    for diff in depth_diff:
+        if diff > 5:
             condition.append("High Sedimentation")
             maintenance_suggestions.append("Increase depth by dredging and use sediment for shore strengthening.")
             maintenance_frequency.append("High (Every Year)")
-        elif b > bp:
+        elif diff < 2:
             condition.append("High Erosion")
             maintenance_suggestions.append("Strengthen shores to prevent erosion.")
             maintenance_frequency.append("Moderate (Every 2-3 Years)")
@@ -40,65 +42,81 @@ def generate_data(n=300):
             condition.append("Stable")
             maintenance_suggestions.append("Regular maintenance of inlets and outlets required.")
             maintenance_frequency.append("Low (Every 5 Years)")
-    
+
+    material_cost_per_unit = 100  
+    base_cost = (surface_area_target - surface_area_current) * depth_diff * (breadth_target - breadth_current) * material_cost_per_unit
+    final_cost = base_cost + prev_maintenance_cost
+
     df = pd.DataFrame({
-        'Surface_Area': surface_area,
-        'Depth': depth,
-        'Breadth': breadth,                                                                                                                                                                                                                         
+        'Surface_Area_Current': surface_area_current,
+        'Depth_Current': depth_current,
+        'Breadth_Current': breadth_current,
+        'Inflow_Capacity_m3_per_month': inflow_capacity,  # Changed label
+        'Surface_Area_Target': surface_area_target,
+        'Depth_Target': depth_target,
+        'Breadth_Target': breadth_target,
         'Condition': condition,
-        'Maintenance_Suggestions': maintenance_suggestions,
         'Maintenance_Frequency': maintenance_frequency,
-        'Prev_Maintenance_Cost': previous_maintenance_cost,
-        'Auction_Price': auction_price
+        'Maintenance_Suggestions': maintenance_suggestions,
+        'Prev_Maintenance_Cost': prev_maintenance_cost,
+        'Estimated_Cost': final_cost
     })
     return df
 
-data = generate_data(300)
-data.to_csv("lake_data.csv", index=False)
+# Load dataset
+try:
+    df = pd.read_csv("lake_data.csv")
+except FileNotFoundError:
+    df = generate_data(300)
+    df.to_csv("lake_data.csv", index=False)
 
-# Load Data
-df = pd.read_csv("lake_data.csv")
-
-# Preprocessing
+# Encode categorical features
 encoder = OneHotEncoder()
-categorical_cols = ["Condition"]
-categorical_data = encoder.fit_transform(df[categorical_cols]).toarray()
-categorical_df = pd.DataFrame(categorical_data, columns=encoder.get_feature_names_out())
-df = df.drop(columns=categorical_cols).join(categorical_df)
+condition_encoded = encoder.fit_transform(df[['Condition']]).toarray()
+condition_df = pd.DataFrame(condition_encoded, columns=encoder.get_feature_names_out())
+
+df = df.drop(columns=["Condition", "Maintenance_Frequency", "Maintenance_Suggestions"])
+df = df.join(condition_df)
 
 # Split Data
-X = df.drop(columns=["Auction_Price", "Maintenance_Suggestions", "Maintenance_Frequency"])
-y = df["Auction_Price"]
+X = df.drop(columns=["Estimated_Cost"])
+y = df["Estimated_Cost"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train Model
+# Train & Save Model
 model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Evaluate Model
-y_pred = model.predict(X_test)
-print("MAE:", mean_absolute_error(y_test, y_pred))
-print("MSE:", mean_squared_error(y_test, y_pred))
-print("R2 Score:", r2_score(y_test, y_pred))
+with open("lake_model.pkl", "wb") as f:
+    pickle.dump(model, f)
 
-# Deployment with Streamlit
-st.title("Irrigation Lake Maintenance Predictor")
-st.sidebar.header("Enter Lake Details")
-surface_area = st.sidebar.slider("Surface Area (km²)", 1.0, 500.0, 50.0)
-depth = st.sidebar.slider("Depth (m)", 5.0, 50.0, 20.0)
-breadth = st.sidebar.slider("Breadth (km)", 1.0, 100.0, 10.0)
+# Streamlit UI
+st.title("Irrigation Lake Maintenance Cost Predictor")
+st.sidebar.header("Enter Lake Dimensions")
+
+# User Inputs
+surface_area_current = st.sidebar.slider("Current Surface Area (km²)", 1.0, 500.0, 50.0)
+depth_current = st.sidebar.slider("Current Depth (m)", 5.0, 50.0, 20.0)
+breadth_current = st.sidebar.slider("Current Breadth (km)", 1.0, 100.0, 10.0)
+inflow_capacity = st.sidebar.slider("Inflow Capacity (m³/month)", 1000, 50000, 10000)  # Updated unit
+
+# Automate Target Dimensions Based on Inflow Capacity
+surface_area_target = surface_area_current + (inflow_capacity / 10000)
+depth_target = depth_current + (inflow_capacity / 20000)
+breadth_target = breadth_current + (inflow_capacity / 15000)
+
 prev_cost = st.sidebar.number_input("Previous Maintenance Cost", 50000, 500000, 100000)
+material_cost = st.sidebar.number_input("Material Cost (₹/unit)", 50, 500, 100)
 
-depth_prev = depth + np.random.uniform(-5, 5)
-breadth_prev = breadth + np.random.uniform(-5, 5)
-surface_area_prev = surface_area + np.random.uniform(-10, 10)
+# Compute Depth Difference for Condition
+depth_diff = depth_target - depth_current
 
-# Automate Condition Calculation and Maintenance Suggestion
-if depth < depth_prev:
+# Determine Condition, Maintenance Frequency, and Suggestions
+if depth_diff > 5:
     condition = "High Sedimentation"
     maintenance_suggestion = "Increase depth by dredging and use sediment for shore strengthening."
     maintenance_frequency = "High (Every Year)"
-elif breadth > breadth_prev:
+elif depth_diff < 2:
     condition = "High Erosion"
     maintenance_suggestion = "Strengthen shores to prevent erosion."
     maintenance_frequency = "Moderate (Every 2-3 Years)"
@@ -111,10 +129,26 @@ st.write(f"### Computed Lake Condition: {condition}")
 st.write(f"### Suggested Maintenance: {maintenance_suggestion}")
 st.write(f"### Maintenance Frequency: {maintenance_frequency}")
 
-input_data = pd.DataFrame([[surface_area, depth, breadth, prev_cost, condition]], columns=["Surface_Area", "Depth", "Breadth", "Prev_Maintenance_Cost", "Condition"])
-input_data = input_data.join(pd.DataFrame(encoder.transform(input_data[["Condition"]]).toarray(), columns=encoder.get_feature_names_out()))
-input_data = input_data.drop(columns=["Condition"])
+# Encode Condition for Prediction
+condition_input = pd.DataFrame(encoder.transform([[condition]]).toarray(), columns=encoder.get_feature_names_out())
+
+# Define input data for prediction
+input_data = pd.DataFrame([[surface_area_current, depth_current, breadth_current,
+                            inflow_capacity, surface_area_target, depth_target, breadth_target, prev_cost]],
+                          columns=["Surface_Area_Current", "Depth_Current", "Breadth_Current",
+                                   "Inflow_Capacity_m3_per_month", "Surface_Area_Target", "Depth_Target", "Breadth_Target",
+                                   "Prev_Maintenance_Cost"])
+
+input_data = input_data.join(condition_input)
+
+# Load Model & Predict
+with open("lake_model.pkl", "rb") as f:
+    loaded_model = pickle.load(f)
 
 if st.sidebar.button("Predict Maintenance Cost"):
-    pred_price = model.predict(input_data)[0]
-    st.write(f"Predicted Maintenance Cost: ₹{pred_price:,.2f}")
+    pred_price = loaded_model.predict(input_data)[0]
+    
+    # Adjust price based on user-defined material cost
+    adjusted_price = pred_price + (material_cost * (surface_area_target - surface_area_current) * depth_diff * (breadth_target - breadth_current))
+    
+    st.write(f"Predicted Maintenance Cost: ₹{adjusted_price:,.2f}")
