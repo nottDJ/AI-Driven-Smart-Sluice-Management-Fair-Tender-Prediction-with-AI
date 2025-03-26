@@ -12,12 +12,12 @@ def generate_data(n=300):
     surface_area_current = np.random.uniform(1, 500, n)  
     depth_current = np.random.uniform(5, 50, n)  
     breadth_current = np.random.uniform(1, 100, n)  
-    inflow_capacity = np.random.uniform(1000, 50000, n)  # Inflow amount in cubic meters per month
+    inflow_amount = np.random.uniform(0.1, 5.0, n)  # New parameter for inflow capacity
 
-    # Automate Target Dimensions Based on Inflow Capacity
-    surface_area_target = surface_area_current + (inflow_capacity / 10000)
-    depth_target = depth_current + (inflow_capacity / 20000)
-    breadth_target = breadth_current + (inflow_capacity / 15000)
+    # Automate Target Dimensions Based on Inflow Amount
+    surface_area_target = surface_area_current + (inflow_amount * 2)
+    depth_target = depth_current + (inflow_amount * 1.5)
+    breadth_target = breadth_current + (inflow_amount * 1)
 
     prev_maintenance_cost = np.random.uniform(50000, 500000, n)
 
@@ -51,7 +51,7 @@ def generate_data(n=300):
         'Surface_Area_Current': surface_area_current,
         'Depth_Current': depth_current,
         'Breadth_Current': breadth_current,
-        'Inflow_Capacity_m3_per_month': inflow_capacity,  # Changed label
+        'Inflow_Amount': inflow_amount,
         'Surface_Area_Target': surface_area_target,
         'Depth_Target': depth_target,
         'Breadth_Target': breadth_target,
@@ -98,12 +98,12 @@ st.sidebar.header("Enter Lake Dimensions")
 surface_area_current = st.sidebar.slider("Current Surface Area (km²)", 1.0, 500.0, 50.0)
 depth_current = st.sidebar.slider("Current Depth (m)", 5.0, 50.0, 20.0)
 breadth_current = st.sidebar.slider("Current Breadth (km)", 1.0, 100.0, 10.0)
-inflow_capacity = st.sidebar.slider("Inflow Capacity (m³/month)", 1000, 50000, 10000)  # Updated unit
+inflow_amount = st.sidebar.slider("Inflow Amount", 0.1, 10.0, 2.0)  # New inflow parameter
 
-# Automate Target Dimensions Based on Inflow Capacity
-surface_area_target = surface_area_current + (inflow_capacity / 10000)
-depth_target = depth_current + (inflow_capacity / 20000)
-breadth_target = breadth_current + (inflow_capacity / 15000)
+# Automate Target Dimensions Based on Inflow Amount
+surface_area_target = surface_area_current + (inflow_amount * 2)
+depth_target = depth_current + (inflow_amount * 1.5)
+breadth_target = breadth_current + (inflow_amount * 1)
 
 prev_cost = st.sidebar.number_input("Previous Maintenance Cost", 50000, 500000, 100000)
 material_cost = st.sidebar.number_input("Material Cost (₹/unit)", 50, 500, 100)
@@ -134,9 +134,9 @@ condition_input = pd.DataFrame(encoder.transform([[condition]]).toarray(), colum
 
 # Define input data for prediction
 input_data = pd.DataFrame([[surface_area_current, depth_current, breadth_current,
-                            inflow_capacity, surface_area_target, depth_target, breadth_target, prev_cost]],
+                            inflow_amount, surface_area_target, depth_target, breadth_target, prev_cost]],
                           columns=["Surface_Area_Current", "Depth_Current", "Breadth_Current",
-                                   "Inflow_Capacity_m3_per_month", "Surface_Area_Target", "Depth_Target", "Breadth_Target",
+                                   "Inflow_Amount", "Surface_Area_Target", "Depth_Target", "Breadth_Target",
                                    "Prev_Maintenance_Cost"])
 
 input_data = input_data.join(condition_input)
