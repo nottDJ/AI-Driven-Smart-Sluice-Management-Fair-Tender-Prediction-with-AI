@@ -107,13 +107,16 @@ depth_current = st.sidebar.slider("Current Depth (m)", 5.0, 50.0, 20.0)
 breadth_current = st.sidebar.slider("Current Breadth (km)", 1.0, 100.0, 10.0)
 inflow_amount = st.sidebar.slider("Inflow Amount", 0.1, 10.0, 2.0)
 
+# Remove the maximum limit for Previous Maintenance Cost
+prev_cost = st.sidebar.number_input("Previous Maintenance Cost (₹)", min_value=50000, value=1000000)
+
+# Remove the maximum limit for Material Cost
+material_cost = st.sidebar.number_input("Material Cost (₹/unit)", min_value=50, value=100)
+
 # Automate Target Dimensions Based on Inflow Amount
 surface_area_target = surface_area_current + (inflow_amount * 2)
 depth_target = depth_current + (inflow_amount * 1.5)
 breadth_target = breadth_current + (inflow_amount * 1)
-
-prev_cost = st.sidebar.number_input("Previous Maintenance Cost (₹)", 50000, 500000, 100000)
-material_cost = st.sidebar.number_input("Material Cost (₹/unit)", 50, 500, 100)
 
 # Compute Depth Difference for Condition
 depth_diff = depth_target - depth_current
