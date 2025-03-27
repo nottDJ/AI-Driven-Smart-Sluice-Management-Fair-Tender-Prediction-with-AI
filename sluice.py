@@ -6,16 +6,13 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestRegressor
 import streamlit as st
 
-# Set page configuration
-st.set_page_config(page_title="Lake Maintenance Cost Predictor", layout="wide")
-
 # Generate Sample Data
 def generate_data(n=300):
     np.random.seed(42)
-    surface_area_current = np.random.uniform(1, 500, n)
-    depth_current = np.random.uniform(5, 50, n)
-    breadth_current = np.random.uniform(1, 100, n)
-    inflow_amount = np.random.uniform(0.1, 5.0, n)
+    surface_area_current = np.random.uniform(1, 500, n)  
+    depth_current = np.random.uniform(5, 50, n)  
+    breadth_current = np.random.uniform(1, 100, n)  
+    inflow_amount = np.random.uniform(0.1, 5.0, n)  # New parameter for inflow capacity
 
     # Automate Target Dimensions Based on Inflow Amount
     surface_area_target = surface_area_current + (inflow_amount * 2)
@@ -46,7 +43,7 @@ def generate_data(n=300):
             maintenance_suggestions.append("Regular maintenance of inlets and outlets required.")
             maintenance_frequency.append("Low (Every 5 Years)")
 
-    material_cost_per_unit = 100
+    material_cost_per_unit = 100  
     base_cost = (surface_area_target - surface_area_current) * depth_diff * (breadth_target - breadth_current) * material_cost_per_unit
     final_cost = base_cost + prev_maintenance_cost
 
@@ -94,29 +91,22 @@ with open("lake_model.pkl", "wb") as f:
     pickle.dump(model, f)
 
 # Streamlit UI
-st.title("**Smart Irrigation Lake Management & Maintenance Cost Prediction**")
-st.markdown("### Predict the maintenance cost of irrigation lakes based on their dimensions and conditions.")
-
-# Sidebar for user inputs
+st.title("Irrigation Lake Maintenance Cost Predictor")
 st.sidebar.header("Enter Lake Dimensions")
-st.sidebar.markdown("Provide the details of the lake to estimate the maintenance cost.")
 
 # User Inputs
 surface_area_current = st.sidebar.slider("Current Surface Area (km²)", 1.0, 500.0, 50.0)
 depth_current = st.sidebar.slider("Current Depth (m)", 5.0, 50.0, 20.0)
 breadth_current = st.sidebar.slider("Current Breadth (km)", 1.0, 100.0, 10.0)
-inflow_amount = st.sidebar.slider("Inflow Amount", 0.1, 10.0, 2.0)
-
-# Remove the maximum limit for Previous Maintenance Cost
-prev_cost = st.sidebar.number_input("Previous Maintenance Cost (₹)", min_value=50000, value=1000000)
-
-# Remove the maximum limit for Material Cost
-material_cost = st.sidebar.number_input("Material Cost (₹/unit)", min_value=50, value=100)
+inflow_amount = st.sidebar.slider("Inflow Amount", 0.1, 10.0, 2.0)  # New inflow parameter
 
 # Automate Target Dimensions Based on Inflow Amount
 surface_area_target = surface_area_current + (inflow_amount * 2)
 depth_target = depth_current + (inflow_amount * 1.5)
 breadth_target = breadth_current + (inflow_amount * 1)
+
+prev_cost = st.sidebar.number_input("Previous Maintenance Cost", 50000, 500000, 100000)
+material_cost = st.sidebar.number_input("Material Cost (₹/unit)", 50, 500, 100)
 
 # Compute Depth Difference for Condition
 depth_diff = depth_target - depth_current
@@ -134,7 +124,7 @@ else:
     condition = "Stable"
     maintenance_suggestion = "Regular maintenance of inlets and outlets required."
     maintenance_frequency = "Low (Every 5 Years)"
-
+    
 # Display computed results in a box
 with st.container():
     st.markdown("### 🛠 **Computed Lake Condition**")
@@ -160,11 +150,11 @@ with open("lake_model.pkl", "rb") as f:
 
 if st.sidebar.button("Predict Maintenance Cost"):
     pred_price = loaded_model.predict(input_data)[0]
-
+    
     # Adjust price based on user-defined material cost
     adjusted_price = pred_price + (material_cost * (surface_area_target - surface_area_current) * depth_diff * (breadth_target - breadth_current))
-
-    # Display predicted cost in a box
+    
+     # Display predicted cost in a box
     with st.container():
         st.markdown("### 💰 **Predicted Maintenance Cost**")
         st.success(f"₹{adjusted_price:,.2f}")
